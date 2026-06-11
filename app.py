@@ -35,7 +35,7 @@ MODEL_CONFIG = {
 }
 
 # ── Runtime state (in-memory, not persisted) ───────────────────────────────────
-_clients       = {}   # "provider_key8" -> client object
+_clients       = {}   # "provider_hash" -> openai.OpenAI client (仅 openai-compatible)
 _conversations = {}   # session_id -> [{"role","content"}]
 
 # ── Persistence helpers ────────────────────────────────────────────────────────
@@ -167,47 +167,54 @@ def _search(query: str, doc_ids: list | None = None, top_k: int = 6) -> list:
 
 # ── LLM client & caller ────────────────────────────────────────────────────────
 def _get_client(provider: str, api_key: str | None = None):
+    """返回 (credentials_dict, error_str)。
+    Claude: {'type': 'anthropic', 'key': ...}
+    OpenAI-compatible: {'type': 'openai', 'client': OpenAI(...)}
+    """
     key = (api_key or _default_key(provider) or '').strip()
-
-    # 调试：打印实际使用的 key 信息
-    print(f'[_get_client] provider={provider} '
-          f'key_prefix={key[:8]!r} key_len={len(key)} '
-          f'env_raw={os.environ.get("ANTHROPIC_API_KEY","(not set)")[:8]!r}',
-          flush=True)
+    print(f'[_get_client] provider={provider} key_prefix={key[:8]!r} key_len={len(key)}', flush=True)
 
     if not key:
         return None, f'未配置 {provider} 的 API Key'
 
-    # 用完整 key 的哈希做缓存键，避免不同 key 前8位相同时命中错误缓存
-    import hashlib
-    ck = f'{provider}_{hashlib.md5(key.encode()).hexdigest()[:12]}'
-    if ck in _clients:
-        return _clients[ck], None
-    try:
-        cfg = MODEL_CONFIG[provider]
-        if cfg['api_type'] == 'anthropic':
-            from anthropic import Anthropic
-            print(f'[Anthropic] new client key={key[:8]!r} len={len(key)}', flush=True)
-            c = Anthropic(api_key=key)
-        else:
-            from openai import OpenAI
-            c = OpenAI(api_key=key, base_url=cfg['base_url'])
-        _clients[ck] = c
-        return c, None
-    except Exception as e:
-        return None, str(e)
-
-def _call_llm(provider: str, client, messages: list,
-              system: str | None = None, max_tokens: int = 2000) -> str:
     cfg = MODEL_CONFIG[provider]
     if cfg['api_type'] == 'anthropic':
-        kw = dict(model=cfg['model'], max_tokens=max_tokens, messages=messages)
+        # 不使用 SDK，直接返回 key，由 _call_llm 用 requests 发 HTTP
+        return {'type': 'anthropic', 'key': key}, None
+    else:
+        import hashlib
+        from openai import OpenAI
+        ck = f'{provider}_{hashlib.md5(key.encode()).hexdigest()[:12]}'
+        if ck not in _clients:
+            _clients[ck] = OpenAI(api_key=key, base_url=cfg['base_url'])
+        return {'type': 'openai', 'client': _clients[ck]}, None
+
+def _call_llm(provider: str, creds: dict, messages: list,
+              system: str | None = None, max_tokens: int = 2000) -> str:
+    cfg = MODEL_CONFIG[provider]
+    if creds['type'] == 'anthropic':
+        import requests as _req
+        key = creds['key']
+        print(f'[Claude HTTP] POST /v1/messages key={key[:8]!r} len={len(key)}', flush=True)
+        payload = {'model': cfg['model'], 'max_tokens': max_tokens, 'messages': messages}
         if system:
-            kw['system'] = system
-        return client.messages.create(**kw).content[0].text
+            payload['system'] = system
+        resp = _req.post(
+            'https://api.anthropic.com/v1/messages',
+            headers={
+                'x-api-key': key,
+                'anthropic-version': '2023-06-01',
+                'content-type': 'application/json',
+            },
+            json=payload,
+            timeout=120,
+        )
+        if resp.status_code != 200:
+            raise Exception(f'Claude API {resp.status_code}: {resp.text[:300]}')
+        return resp.json()['content'][0]['text']
     else:
         oai = ([{'role': 'system', 'content': system}] if system else []) + messages
-        return client.chat.completions.create(
+        return creds['client'].chat.completions.create(
             model=cfg['model'], max_tokens=max_tokens, messages=oai
         ).choices[0].message.content
 
@@ -317,26 +324,18 @@ def check_defaults():
 def debug_env():
     def mask(s):
         s = s.strip()
-        return f'{s[:4]}…({len(s)} chars)' if s else '(empty)'
+        return f'{s[:4]}...({len(s)} chars)' if s else '(empty)'
 
-    hardcoded   = DEFAULT_KEYS.get('claude', '')
-    env_val     = os.environ.get('CLAUDE_KEY', '')
-    final       = _default_key('claude')
-
+    env_val = os.environ.get('ANTHROPIC_API_KEY', '')
+    final   = _default_key('claude')
     return jsonify({
-        # DEFAULT_KEYS 里硬编码的值
-        'A_hardcoded_len':    len(hardcoded.strip()),
-        'A_hardcoded_prefix': mask(hardcoded),
-        # 环境变量 CLAUDE_KEY 的原始值
-        'B_env_raw_len':      len(env_val),
-        'B_env_raw_prefix':   mask(env_val),
-        'B_env_present':      'CLAUDE_KEY' in os.environ,
-        # _default_key() 最终返回的值
-        'C_final_len':        len(final),
-        'C_final_prefix':     mask(final),
-        'C_final_ok':         bool(final),
-        # 所有含 CLAUDE 或 KEY 的环境变量名
-        'D_related_env_names': sorted(k for k in os.environ if 'CLAUDE' in k.upper() or 'KEY' in k.upper()),
+        'env_ANTHROPIC_API_KEY_len':    len(env_val),
+        'env_ANTHROPIC_API_KEY_prefix': mask(env_val),
+        'env_present':                  'ANTHROPIC_API_KEY' in os.environ,
+        'final_key_len':                len(final),
+        'final_key_prefix':             mask(final),
+        'final_key_ok':                 bool(final),
+        'related_env_names': sorted(k for k in os.environ if 'ANTHROPIC' in k.upper() or 'KEY' in k.upper()),
     })
 
 @app.route('/api/set-key', methods=['POST'])
