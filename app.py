@@ -279,6 +279,21 @@ def get_documents():
 def check_defaults():
     return jsonify({'available': {p: bool(_default_key(p)) for p in ('claude', 'deepseek', 'qwen')}})
 
+@app.route('/api/debug-env', methods=['GET'])
+def debug_env():
+    """诊断接口：确认 Railway 环境变量是否正确注入。确认后可删除此接口。"""
+    val = os.environ.get('CLAUDE_KEY', '')
+    # 只暴露 key 的长度和前4位，不暴露完整值
+    masked = (val[:4] + '…(' + str(len(val)) + 'chars)') if val else '(empty)'
+    # 列出所有包含 CLAUDE 或 KEY 的变量名（不含值）
+    related_names = [k for k in os.environ if 'CLAUDE' in k.upper() or 'KEY' in k.upper()]
+    return jsonify({
+        'CLAUDE_KEY_value':  masked,
+        'CLAUDE_KEY_present': 'CLAUDE_KEY' in os.environ,
+        '_default_key_result': bool(_default_key('claude')),
+        'related_env_names':  sorted(related_names),
+    })
+
 @app.route('/api/set-key', methods=['POST'])
 def set_key():
     data = request.json or {}
@@ -460,8 +475,8 @@ def chat():
 # ── Entry point ────────────────────────────────────────────────────────────────
 if __name__ == '__main__':
     print('诠释者 · 哲学 Wiki 阅读智能体')
-    for p, k in DEFAULT_KEYS.items():
-        status = 'OK' if k else '-- (请在界面填入 Key)'
+    for p in ('claude', 'deepseek', 'qwen'):
+        status = 'OK' if _default_key(p) else '-- (请在界面填入 Key)'
         print(f'  {p}: {status}')
     print('http://localhost:5000')
     app.run(debug=False, port=5000)
