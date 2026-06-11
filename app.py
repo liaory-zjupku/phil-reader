@@ -21,11 +21,11 @@ CORS(app)
 
 # Claude 从环境变量 CLAUDE_KEY 读取默认 Key，用户不填时自动使用。
 # DeepSeek / 通义千问无默认 Key，用户必须在界面自行填入才能使用。
-DEFAULT_KEYS = {
-    "claude":   os.environ.get('CLAUDE_KEY', ''),
-    "deepseek": '',
-    "qwen":     '',
-}
+# 注意：不在模块级缓存，每次调用时实时读取，确保部署平台的环境变量始终生效。
+def _default_key(provider: str) -> str:
+    if provider == 'claude':
+        return os.environ.get('CLAUDE_KEY', '')
+    return ''
 
 MODEL_CONFIG = {
     "claude":   {"model": "claude-sonnet-4-6", "api_type": "anthropic"},
@@ -101,15 +101,40 @@ def parse_pdf(filepath) -> tuple[list, int]:
 def parse_epub(filepath) -> tuple[list, int]:
     from ebooklib import epub
     from bs4 import BeautifulSoup
+
+    _HTML_TYPES = {'application/xhtml+xml', 'text/html', 'text/xml'}
+
     book = epub.read_epub(str(filepath), options={'ignore_ncx': True})
-    chunks, page_num = [], 0
+
+    # 1. 按 spine 读取顺序收集文档项（保证章节顺序正确）
+    doc_items = []
+    seen_ids = set()
+    for item_id, _ in book.spine:
+        item = book.get_item_with_id(item_id)
+        if item is not None and item.id not in seen_ids:
+            seen_ids.add(item.id)
+            doc_items.append(item)
+
+    # 2. 补充不在 spine 中的 HTML 文档项（部分 epub 内容不挂 spine）
     for item in book.get_items():
-        if item.get_type() == 9:
-            page_num += 1
+        if item.id not in seen_ids and (
+            item.media_type in _HTML_TYPES or item.get_type() == 9
+        ):
+            seen_ids.add(item.id)
+            doc_items.append(item)
+
+    chunks, page_num = [], 0
+    for item in doc_items:
+        try:
             soup = BeautifulSoup(item.get_content(), 'html.parser')
             text = soup.get_text(separator='\n', strip=True)
-            if len(text.strip()) >= 20:
-                chunks.extend(_make_chunks(text, page_num))
+        except Exception:
+            continue
+        if len(text.strip()) < 20:
+            continue
+        page_num += 1
+        chunks.extend(_make_chunks(text, page_num))
+
     return chunks, page_num
 
 def parse_docx(filepath) -> tuple[list, int]:
@@ -157,7 +182,7 @@ def _search(query: str, doc_ids: list | None = None, top_k: int = 6) -> list:
 
 # ── LLM client & caller ────────────────────────────────────────────────────────
 def _get_client(provider: str, api_key: str | None = None):
-    key = api_key or DEFAULT_KEYS.get(provider, '')
+    key = api_key or _default_key(provider)
     if not key:
         return None, f'未配置 {provider} 的 API Key'
     ck = f'{provider}_{key[:8]}'
@@ -266,7 +291,7 @@ def get_documents():
 
 @app.route('/api/check-defaults', methods=['GET'])
 def check_defaults():
-    return jsonify({'available': {p: bool(k) for p, k in DEFAULT_KEYS.items()}})
+    return jsonify({'available': {p: bool(_default_key(p)) for p in ('claude', 'deepseek', 'qwen')}})
 
 @app.route('/api/set-key', methods=['POST'])
 def set_key():
