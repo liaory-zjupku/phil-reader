@@ -143,8 +143,10 @@ textarea.chat-input::placeholder { color: var(--ink-faint); opacity: 0.7; }
 /* ── Wiki panel ── */
 .wiki-overlay { display: none; position: fixed; top: 52px; left: 0; right: 0; bottom: 0; background: rgba(26,20,16,0.22); z-index: 40; }
 .wiki-overlay.on { display: block; }
-.wiki-panel { position: fixed; top: 52px; right: -450px; width: 440px; height: calc(100vh - 52px); background: var(--parchment-dark); border-left: 1px solid var(--border); transition: right 0.3s cubic-bezier(0.25,0.46,0.45,0.94); overflow-y: auto; z-index: 50; }
+.wiki-panel { position: fixed; top: 52px; right: -480px; width: 464px; max-width: 92vw; height: calc(100vh - 52px); background: var(--parchment-dark); border-left: 1px solid var(--border); box-shadow: -16px 0 40px -18px rgba(26,20,16,0.4); transition: right 0.34s cubic-bezier(0.22,0.61,0.36,1); overflow-y: auto; z-index: 50; }
 .wiki-panel.open { right: 0; }
+.wiki-panel::-webkit-scrollbar { width: 8px; }
+.wiki-panel::-webkit-scrollbar-thumb { background: var(--gold-light); border-radius: 4px; }
 .wiki-ph { padding: 13px 15px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 8px; position: sticky; top: 0; background: var(--parchment-dark); z-index: 1; }
 .wiki-ph-title { font-family: 'Noto Serif SC', serif; font-size: 13px; font-weight: 600; color: var(--ink); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .btn-close { background: none; border: 1px solid var(--border); border-radius: 50%; width: 25px; height: 25px; display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--ink-faint); font-size: 13px; flex-shrink: 0; }
@@ -152,56 +154,67 @@ textarea.chat-input::placeholder { color: var(--ink-faint); opacity: 0.7; }
 .wiki-body { padding: 14px; }
 
 /* Wiki content */
-.w-thesis { background: rgba(154,125,58,0.07); border: 1px solid var(--gold-light); border-radius: 6px; padding: 13px 15px; margin-bottom: 14px; }
-.w-thesis-lbl { font-family: 'EB Garamond', serif; font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--gold); margin-bottom: 5px; }
-.w-thesis-txt { font-family: 'Noto Serif SC', serif; font-size: 13px; line-height: 1.85; color: var(--ink); }
+.w-thesis { position: relative; background: linear-gradient(135deg, rgba(154,125,58,0.12), rgba(154,125,58,0.04)); border: 1px solid var(--gold-light); border-radius: 9px; padding: 16px 18px 16px 20px; margin-bottom: 18px; overflow: hidden; }
+.w-thesis::before { content: '“'; position: absolute; top: -10px; left: 8px; font-family: 'EB Garamond', serif; font-size: 64px; color: var(--gold); opacity: 0.16; line-height: 1; }
+.w-thesis-lbl { display: flex; align-items: center; gap: 6px; font-family: 'EB Garamond', serif; font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--gold); margin-bottom: 7px; }
+.w-thesis-lbl::after { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, var(--gold-light), transparent); }
+.w-thesis-txt { font-family: 'Noto Serif SC', serif; font-size: 13.5px; line-height: 1.9; color: var(--ink); position: relative; }
 
-.w-sec { margin-bottom: 10px; border: 1px solid var(--border); border-radius: 5px; overflow: hidden; }
-.w-sec-hd { padding: 8px 13px; background: var(--parchment-deep); cursor: pointer; display: flex; align-items: center; justify-content: space-between; user-select: none; }
-.w-sec-hd:hover { background: var(--parchment-deep); filter: brightness(0.97); }
-.w-sec-title { font-family: 'EB Garamond', serif; font-size: 12px; letter-spacing: 0.08em; color: var(--ink-soft); }
-.w-arrow { font-size: 9px; color: var(--ink-faint); transition: transform 0.2s; }
+.w-sec { margin-bottom: 12px; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--parchment-dark); transition: box-shadow 0.2s; }
+.w-sec.exp { box-shadow: 0 4px 14px -8px rgba(26,20,16,0.28); }
+.w-sec-hd { padding: 11px 14px; cursor: pointer; display: flex; align-items: center; gap: 9px; user-select: none; transition: background 0.18s; }
+.w-sec-hd:hover { background: var(--parchment-deep); }
+.w-sec-ico { width: 22px; height: 22px; border-radius: 6px; background: var(--gold-pale); border: 1px solid var(--gold-light); display: flex; align-items: center; justify-content: center; font-size: 12px; color: var(--gold); flex-shrink: 0; font-family: 'EB Garamond', serif; }
+.w-sec-title { font-family: 'Noto Serif SC', serif; font-size: 13px; font-weight: 600; letter-spacing: 0.04em; color: var(--ink); flex: 1; }
+.w-sec-count { font-size: 10px; color: var(--ink-faint); background: rgba(0,0,0,0.04); border-radius: 9px; padding: 1px 8px; font-family: 'EB Garamond', serif; }
+.w-arrow { font-size: 9px; color: var(--ink-faint); transition: transform 0.22s; }
 .w-sec.exp .w-arrow { transform: rotate(180deg); }
-.w-sec-bd { display: none; padding: 10px 13px; background: rgba(255,255,255,0.45); }
-.w-sec.exp .w-sec-bd { display: block; }
+.w-sec-bd { display: none; padding: 4px 14px 12px; }
+.w-sec.exp .w-sec-bd { display: block; animation: wfade 0.25s ease; }
+@keyframes wfade { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
 
 /* Chapter */
-.ch-item { padding: 7px 0; border-bottom: 1px dashed var(--border); }
+.ch-item { position: relative; padding: 9px 0 9px 26px; border-bottom: 1px dashed var(--border); }
 .ch-item:last-child { border-bottom: none; }
-.ch-title { font-family: 'Noto Serif SC', serif; font-size: 12px; font-weight: 600; color: var(--ink); margin-bottom: 2px; }
-.ch-summary { font-size: 11px; color: var(--ink-soft); line-height: 1.6; margin-bottom: 2px; }
-.ch-claim { font-size: 11px; color: var(--gold); font-style: italic; font-family: 'EB Garamond', serif; }
+.ch-num { position: absolute; left: 0; top: 9px; width: 18px; height: 18px; border-radius: 50%; background: var(--gold); color: #fff; font-size: 10px; font-family: 'EB Garamond', serif; display: flex; align-items: center; justify-content: center; }
+.ch-title { font-family: 'Noto Serif SC', serif; font-size: 12.5px; font-weight: 600; color: var(--ink); margin-bottom: 3px; }
+.ch-summary { font-size: 11.5px; color: var(--ink-soft); line-height: 1.65; margin-bottom: 4px; }
+.ch-claim { font-size: 11px; color: var(--gold); font-style: italic; font-family: 'EB Garamond', serif; padding-left: 9px; border-left: 2px solid var(--gold-light); }
 
 /* Concepts */
-.cc-card { background: rgba(255,255,255,0.65); border: 1px solid var(--border); border-left: 3px solid var(--gold); border-radius: 3px; padding: 8px 10px; margin-bottom: 7px; }
+.cc-card { background: rgba(255,255,255,0.7); border: 1px solid var(--border); border-left: 3px solid var(--gold); border-radius: 6px; padding: 10px 12px; margin-bottom: 8px; transition: transform 0.15s, box-shadow 0.15s; }
 .cc-card:last-child { margin-bottom: 0; }
-.cc-term { font-family: 'Noto Serif SC', serif; font-size: 12px; font-weight: 600; color: var(--ink); margin-bottom: 2px; }
-.cc-def { font-size: 11px; color: var(--ink-soft); line-height: 1.6; }
-.cc-tags { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 4px; }
-.cc-tag { font-size: 9px; padding: 1px 6px; background: var(--gold-pale); border: 1px solid var(--gold-light); border-radius: 10px; color: var(--gold); }
+.cc-card:hover { transform: translateX(2px); box-shadow: 0 3px 10px -6px rgba(26,20,16,0.3); }
+.cc-term { font-family: 'Noto Serif SC', serif; font-size: 12.5px; font-weight: 700; color: var(--ink); margin-bottom: 3px; }
+.cc-def { font-size: 11.5px; color: var(--ink-soft); line-height: 1.65; }
+.cc-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.cc-tag { font-size: 9.5px; padding: 2px 8px; background: var(--gold-pale); border: 1px solid var(--gold-light); border-radius: 10px; color: var(--gold); }
 
 /* Figures */
-.fig-item { padding: 7px 0; border-bottom: 1px dashed var(--border); }
+.fig-item { padding: 9px 0 9px 12px; border-left: 2px solid rgba(42,74,107,0.25); border-bottom: 1px dashed var(--border); margin-bottom: 2px; }
 .fig-item:last-child { border-bottom: none; }
-.fig-name { font-family: 'Noto Serif SC', serif; font-size: 12px; font-weight: 600; color: var(--blue); }
-.fig-role { font-size: 11px; color: var(--ink-soft); line-height: 1.5; }
-.fig-rel { font-size: 10px; color: var(--ink-faint); font-style: italic; margin-top: 1px; }
+.fig-name { font-family: 'Noto Serif SC', serif; font-size: 12.5px; font-weight: 600; color: var(--blue); }
+.fig-role { font-size: 11.5px; color: var(--ink-soft); line-height: 1.55; }
+.fig-rel { font-size: 10.5px; color: var(--ink-faint); font-style: italic; margin-top: 2px; }
 
 /* Sources */
-.src-item { padding: 6px 0; border-bottom: 1px dashed var(--border); }
+.src-item { padding: 8px 0; border-bottom: 1px dashed var(--border); }
 .src-item:last-child { border-bottom: none; }
-.src-name { font-family: 'Noto Serif SC', serif; font-size: 12px; color: var(--ink); }
-.src-inf { font-size: 11px; color: var(--ink-soft); line-height: 1.5; }
+.src-name { font-family: 'Noto Serif SC', serif; font-size: 12.5px; font-weight: 600; color: var(--ink); margin-bottom: 2px; }
+.src-name::before { content: '↳ '; color: var(--gold); }
+.src-inf { font-size: 11.5px; color: var(--ink-soft); line-height: 1.55; }
 
 /* Prerequisites */
-.pre-chips { display: flex; flex-wrap: wrap; gap: 5px; }
-.pre-chip { padding: 3px 10px; background: rgba(42,74,107,0.07); border: 1px solid rgba(42,74,107,0.2); border-radius: 12px; font-size: 11px; color: var(--blue); }
+.pre-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.pre-chip { padding: 4px 12px; background: rgba(42,74,107,0.08); border: 1px solid rgba(42,74,107,0.22); border-radius: 13px; font-size: 11px; color: var(--blue); transition: background 0.15s; }
+.pre-chip:hover { background: rgba(42,74,107,0.15); }
 
 /* Problems */
-.pb-item { padding: 7px 0; border-bottom: 1px dashed var(--border); }
+.pb-item { padding: 10px 0 10px 14px; position: relative; border-bottom: 1px dashed var(--border); }
 .pb-item:last-child { border-bottom: none; }
-.pb-q { font-family: 'Noto Serif SC', serif; font-size: 12px; color: var(--rust); margin-bottom: 2px; }
-.pb-ans { font-size: 11px; color: var(--ink-soft); line-height: 1.5; }
+.pb-item::before { content: '?'; position: absolute; left: 0; top: 9px; width: 16px; height: 16px; border-radius: 50%; background: var(--rust); color: #fff; font-size: 10px; font-family: 'EB Garamond', serif; display: flex; align-items: center; justify-content: center; }
+.pb-q { font-family: 'Noto Serif SC', serif; font-size: 12.5px; font-weight: 600; color: var(--rust); margin-bottom: 3px; }
+.pb-ans { font-size: 11.5px; color: var(--ink-soft); line-height: 1.6; }
 
 /* Toast */
 .toast { position: fixed; bottom: 76px; left: 50%; transform: translateX(-50%); padding: 9px 18px; background: var(--rust); color: #fff; border-radius: 6px; font-size: 13px; display: none; z-index: 300; box-shadow: 0 4px 14px rgba(0,0,0,0.2); max-width: 85%; text-align: center; }
@@ -519,15 +532,16 @@ function buildWikiHTML(w) {
     parts.push(`<div class="w-thesis"><div class="w-thesis-lbl">整体论点</div><div class="w-thesis-txt">${esc(w.thesis)}</div></div>`);
 
   if (w.chapter_structure?.length)
-    parts.push(sec('章节结构', w.chapter_structure.map(c => `
+    parts.push(sec('章节结构', '目', w.chapter_structure.length, w.chapter_structure.map((c,i) => `
       <div class="ch-item">
+        <div class="ch-num">${i+1}</div>
         <div class="ch-title">${esc(c.title||'')}</div>
         <div class="ch-summary">${esc(c.summary||'')}</div>
-        ${c.key_claim?`<div class="ch-claim">"${esc(c.key_claim)}"</div>`:''}
+        ${c.key_claim?`<div class="ch-claim">${esc(c.key_claim)}</div>`:''}
       </div>`).join(''), true));
 
   if (w.core_concepts?.length)
-    parts.push(sec('核心概念', w.core_concepts.map(c => {
+    parts.push(sec('核心概念', '念', w.core_concepts.length, w.core_concepts.map(c => {
       const tags = (c.related||[]).map(r=>`<span class="cc-tag">${esc(r)}</span>`).join('');
       return `<div class="cc-card">
         <div class="cc-term">${esc(c.term||'')}</div>
@@ -537,7 +551,7 @@ function buildWikiHTML(w) {
     }).join(''), true));
 
   if (w.key_figures?.length)
-    parts.push(sec('关键人物', w.key_figures.map(f => `
+    parts.push(sec('关键人物', '人', w.key_figures.length, w.key_figures.map(f => `
       <div class="fig-item">
         <div class="fig-name">${esc(f.name||'')}</div>
         <div class="fig-role">${esc(f.role||'')}</div>
@@ -545,19 +559,19 @@ function buildWikiHTML(w) {
       </div>`).join('')));
 
   if (w.intellectual_sources?.length)
-    parts.push(sec('思想来源', w.intellectual_sources.map(s => `
+    parts.push(sec('思想来源', '源', w.intellectual_sources.length, w.intellectual_sources.map(s => `
       <div class="src-item">
         <div class="src-name">${esc(s.source||'')}</div>
         <div class="src-inf">${esc(s.influence||'')}</div>
       </div>`).join('')));
 
   if (w.prerequisites?.length)
-    parts.push(sec('前置知识', `<div class="pre-chips">${
+    parts.push(sec('前置知识', '备', w.prerequisites.length, `<div class="pre-chips">${
       w.prerequisites.map(p=>`<span class="pre-chip">${esc(p)}</span>`).join('')
     }</div>`));
 
   if (w.philosophical_problems?.length)
-    parts.push(sec('哲学史问题', w.philosophical_problems.map(p => `
+    parts.push(sec('哲学史问题', '问', w.philosophical_problems.length, w.philosophical_problems.map(p => `
       <div class="pb-item">
         <div class="pb-q">${esc(p.problem||'')}</div>
         <div class="pb-ans">${esc(p.treatment||'')}</div>
@@ -566,10 +580,12 @@ function buildWikiHTML(w) {
   return parts.join('');
 }
 
-function sec(title, body, expanded=false) {
+function sec(title, icon, count, body, expanded=false) {
   return `<div class="w-sec${expanded?' exp':''}">
     <div class="w-sec-hd" onclick="toggleSec(this)">
+      <span class="w-sec-ico">${icon}</span>
       <span class="w-sec-title">${title}</span>
+      ${count!=null?`<span class="w-sec-count">${count}</span>`:''}
       <span class="w-arrow">▼</span>
     </div>
     <div class="w-sec-bd">${body}</div>

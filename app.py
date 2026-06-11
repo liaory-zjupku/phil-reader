@@ -1,10 +1,31 @@
 ﻿import os
+import sys
 import uuid
 import json
 import re
 from pathlib import Path
+
+# Windows 控制台默认 GBK 编码，打印中文/特殊字符会崩溃；强制 UTF-8 输出
+try:
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+    sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+except Exception:
+    pass
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
+
+# ── 本地 .env 加载（无依赖）。Railway/Render 用平台环境变量，不需要此文件 ──────────
+def _load_dotenv():
+    f = Path('.env')
+    if not f.exists():
+        return
+    for line in f.read_text('utf-8').splitlines():
+        line = line.strip()
+        if not line or line.startswith('#') or '=' not in line:
+            continue
+        k, v = line.split('=', 1)
+        os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
+_load_dotenv()
 
 # ── Directories ────────────────────────────────────────────────────────────────
 BASE_DIR    = Path(os.environ.get('DATA_DIR',    'data'))
@@ -19,7 +40,7 @@ for _d in [BASE_DIR, UPLOAD_DIR, WIKIS_DIR, CHUNKS_DIR]:
 app = Flask(__name__, static_folder='.')
 CORS(app)
 
-# Claude 从环境变量 ANTHROPIC_API_KEY 读取（Railway 原生支持此变量名）
+# Claude 从环境变量 ANTHROPIC_API_KEY 读取（本地走 .env，Railway/Render 走平台变量）
 # DeepSeek / 通义千问无默认 Key，用户在界面自行填入
 def _default_key(provider: str) -> str:
     if provider == "claude":
@@ -167,56 +188,64 @@ def _search(query: str, doc_ids: list | None = None, top_k: int = 6) -> list:
 
 # ── LLM client & caller ────────────────────────────────────────────────────────
 def _get_client(provider: str, api_key: str | None = None):
-    """返回 (credentials_dict, error_str)。
-    Claude: {'type': 'anthropic', 'key': ...}
-    OpenAI-compatible: {'type': 'openai', 'client': OpenAI(...)}
-    """
+    """返回 (client, error_str)。Claude 用 Anthropic SDK，其余用 OpenAI 兼容 SDK。
+    两个 SDK 底层都用 httpx/openai，会自动读取 HTTPS_PROXY 环境变量走系统代理。"""
     key = (api_key or _default_key(provider) or '').strip()
-    print(f'[_get_client] provider={provider} key_prefix={key[:8]!r} key_len={len(key)}', flush=True)
-
     if not key:
         return None, f'未配置 {provider} 的 API Key'
 
-    cfg = MODEL_CONFIG[provider]
-    if cfg['api_type'] == 'anthropic':
-        # 不使用 SDK，直接返回 key，由 _call_llm 用 requests 发 HTTP
-        return {'type': 'anthropic', 'key': key}, None
-    else:
-        import hashlib
-        from openai import OpenAI
-        ck = f'{provider}_{hashlib.md5(key.encode()).hexdigest()[:12]}'
-        if ck not in _clients:
-            _clients[ck] = OpenAI(api_key=key, base_url=cfg['base_url'])
-        return {'type': 'openai', 'client': _clients[ck]}, None
+    import hashlib
+    ck = f'{provider}_{hashlib.md5(key.encode()).hexdigest()[:12]}'
+    if ck in _clients:
+        return _clients[ck], None
+    try:
+        cfg = MODEL_CONFIG[provider]
+        if cfg['api_type'] == 'anthropic':
+            from anthropic import Anthropic
+            c = Anthropic(api_key=key)
+        else:
+            from openai import OpenAI
+            c = OpenAI(api_key=key, base_url=cfg['base_url'])
+        _clients[ck] = c
+        return c, None
+    except Exception as e:
+        return None, str(e)
 
-def _call_llm(provider: str, creds: dict, messages: list,
+def _call_llm(provider: str, client, messages: list,
               system: str | None = None, max_tokens: int = 2000) -> str:
     cfg = MODEL_CONFIG[provider]
-    if creds['type'] == 'anthropic':
-        import requests as _req
-        key = creds['key']
-        print(f'[Claude HTTP] POST /v1/messages key={key[:8]!r} len={len(key)}', flush=True)
-        payload = {'model': cfg['model'], 'max_tokens': max_tokens, 'messages': messages}
+    if cfg['api_type'] == 'anthropic':
+        kw = dict(model=cfg['model'], max_tokens=max_tokens, messages=messages)
         if system:
-            payload['system'] = system
-        resp = _req.post(
-            'https://api.anthropic.com/v1/messages',
-            headers={
-                'x-api-key': key,
-                'anthropic-version': '2023-06-01',
-                'content-type': 'application/json',
-            },
-            json=payload,
-            timeout=120,
-        )
-        if resp.status_code != 200:
-            raise Exception(f'Claude API {resp.status_code}: {resp.text[:300]}')
-        return resp.json()['content'][0]['text']
+            kw['system'] = system
+        return client.messages.create(**kw).content[0].text
     else:
         oai = ([{'role': 'system', 'content': system}] if system else []) + messages
-        return creds['client'].chat.completions.create(
+        return client.chat.completions.create(
             model=cfg['model'], max_tokens=max_tokens, messages=oai
         ).choices[0].message.content
+
+def _is_auth_error(e: Exception) -> bool:
+    s = str(e).lower()
+    return (getattr(e, 'status_code', None) == 401
+            or '401' in s or 'authentication' in s or 'invalid x-api-key' in s)
+
+def _llm_call(provider: str, api_key: str | None, messages: list,
+              system: str | None = None, max_tokens: int = 2000) -> str:
+    """构建 client 并调用；若用户自带 key 认证失败，自动回退到默认 key 重试。"""
+    client, err = _get_client(provider, api_key)
+    if not client:
+        raise RuntimeError(err)
+    try:
+        return _call_llm(provider, client, messages, system=system, max_tokens=max_tokens)
+    except Exception as e:
+        default = _default_key(provider)
+        if api_key and default and api_key.strip() != default and _is_auth_error(e):
+            print('[LLM] 用户自带 key 认证失败，回退默认 key 重试', flush=True)
+            c2, err2 = _get_client(provider, default)
+            if c2:
+                return _call_llm(provider, c2, messages, system=system, max_tokens=max_tokens)
+        raise
 
 # ── System prompts ─────────────────────────────────────────────────────────────
 READER_SYSTEM = """你是"诠释者"——专为哲学与人文社科文本深度阅读设计的智能体。
@@ -250,7 +279,7 @@ WIKI_SYSTEM = """你是哲学文本分析专家。根据提供的文本摘样，
 【输出规则——必须严格遵守】
 - 只输出一个 JSON 对象，不得有任何其他内容
 - 不加 ```json 代码块，不加任何说明文字，不加注释
-- 所有字符串值中不得出现未转义的双引号，用 \" 转义
+- 关键：字符串值内部需要引用或强调时，一律使用中文引号「」或书名号《》，绝对禁止使用英文双引号 "。英文双引号只能作为 JSON 的结构符号（包裹键和值），不得出现在值的文字内容里
 - 不得有尾随逗号（最后一项后面不加逗号）
 - 必须是可被 json.loads() 直接解析的合法 JSON
 
@@ -259,38 +288,87 @@ WIKI_SYSTEM = """你是哲学文本分析专家。根据提供的文本摘样，
 
 【数量限制】chapter_structure ≤ 8，core_concepts ≤ 10，key_figures ≤ 8。内容从文本提炼，不确定处加（据文本推断）。"""
 
-def _repair_json(raw: str) -> str:
-    """修复 LLM 常见的 JSON 格式错误，返回可被 json.loads 解析的字符串。"""
+def _extract_json_block(raw: str) -> str:
+    """剥掉 ```代码块``` 包裹，并截取第一个 { 到最后一个 } 之间的内容。"""
     s = raw.strip()
-
-    # 1. 剥掉 ```json ... ``` 或 ``` ... ``` 代码块
     s = re.sub(r'^```[a-zA-Z]*\s*', '', s)
     s = re.sub(r'\s*```$', '', s)
     s = s.strip()
-
-    # 2. 只保留第一个 { 到最后一个 } 之间的内容（去掉前后多余说明文字）
-    start = s.find('{')
-    end   = s.rfind('}')
+    start, end = s.find('{'), s.rfind('}')
     if start != -1 and end != -1 and end > start:
         s = s[start:end + 1]
+    return s
 
-    # 3. 去掉 JSON 注释（// 行注释 和 /* */ 块注释）
+def _repair_json(s: str) -> str:
+    """对已截取的 JSON 文本做"安全"修复——只处理确定不会破坏合法 JSON 的问题。
+    注意：不做单引号→双引号替换（会破坏含撇号的合法 JSON）。"""
+    # 去掉 JSON 注释（// 行注释 和 /* */ 块注释）
     s = re.sub(r'//[^\n]*', '', s)
     s = re.sub(r'/\*.*?\*/', '', s, flags=re.DOTALL)
-
-    # 4. 去掉尾随逗号：, 后面紧跟 } 或 ]
+    # 去掉尾随逗号：, 后面紧跟 } 或 ]
     s = re.sub(r',\s*([}\]])', r'\1', s)
-
-    # 5. 把单引号键/值替换为双引号（仅处理最外层引号，不破坏内部撇号）
-    s = re.sub(r"(?<![\\])'", '"', s)
-
-    # 6. 去掉控制字符（换行符在字符串值内需转义，否则 json.loads 报错）
-    # 只处理字符串值内的裸换行——用 \n 替换
-    def fix_newlines(m):
+    # 字符串值内的裸换行/制表符需转义
+    def fix_ctrl(m):
         return m.group(0).replace('\n', '\\n').replace('\r', '\\r').replace('\t', '\\t')
-    s = re.sub(r'"(?:[^"\\]|\\.)*"', fix_newlines, s)
-
+    s = re.sub(r'"(?:[^"\\]|\\.)*"', fix_ctrl, s)
     return s
+
+def _escape_inner_quotes(s: str) -> str:
+    """状态机：转义字符串值内部未转义的英文双引号。
+    判定规则：字符串内遇到 "，若其后第一个非空白字符是 , : } ] 或到结尾，
+    视为结构性结束引号；否则视为内容引号，转义为 \\"。
+    这能修复 LLM 在中文内容里误用英文引号导致的 JSON 破坏。"""
+    out, i, n, in_str = [], 0, len(s), False
+    while i < n:
+        c = s[i]
+        if not in_str:
+            out.append(c)
+            if c == '"':
+                in_str = True
+            i += 1
+            continue
+        # 在字符串内部
+        if c == '\\':                       # 转义序列，整体保留
+            out.append(c)
+            if i + 1 < n:
+                out.append(s[i + 1])
+                i += 2
+            else:
+                i += 1
+            continue
+        if c == '"':
+            j = i + 1
+            while j < n and s[j] in ' \t\r\n':
+                j += 1
+            nxt = s[j] if j < n else ''
+            if nxt in ',:}]' or nxt == '':  # 结构性结束引号
+                out.append(c)
+                in_str = False
+            else:                            # 内容引号 → 转义
+                out.append('\\"')
+            i += 1
+            continue
+        out.append(c)
+        i += 1
+    return ''.join(out)
+
+def _parse_wiki_json(raw: str) -> dict:
+    """多策略解析 LLM 返回为 dict，依次尝试，返回第一个成功的。全部失败抛异常。"""
+    block = _extract_json_block(raw)
+    attempts = [
+        block,                                          # 1. 原始（多数情况合法）
+        _repair_json(block),                            # 2. 安全修复（注释/尾逗号/控制符）
+        _escape_inner_quotes(block),                    # 3. 转义内部引号
+        _escape_inner_quotes(_repair_json(block)),      # 4. 修复 + 转义引号
+        _repair_json(_escape_inner_quotes(block)),      # 5. 转义引号 + 修复
+    ]
+    last_err = None
+    for cand in attempts:
+        try:
+            return json.loads(cand)
+        except json.JSONDecodeError as e:
+            last_err = e
+    raise last_err
 
 def _sample_for_wiki(chunks: list, max_chars: int = 7000) -> str:
     if not chunks:
@@ -411,10 +489,6 @@ def generate_wiki():
     if doc_id not in _documents:
         return jsonify({'error': '文献不存在'}), 404
 
-    client, err = _get_client(provider, api_key)
-    if not client:
-        return jsonify({'error': f'模型未配置：{err}'}), 400
-
     chunks = _load_chunks(doc_id)
     sample = _sample_for_wiki(chunks)
     if not sample:
@@ -422,54 +496,19 @@ def generate_wiki():
 
     user_msg = f'文献名称：{_documents[doc_id]["name"]}\n\n文本摘样：\n\n{sample}'
     try:
-        # ── 直接用 requests 绕过所有中间函数，测试 401 根因 ──────────────
-        import requests as _req
-        _direct_key = os.environ.get('ANTHROPIC_API_KEY', '').strip()
-        _direct_headers = {
-            'x-api-key': _direct_key,
-            'anthropic-version': '2023-06-01',
-            'content-type': 'application/json',
-        }
-        print('\n[DIRECT-TEST] headers about to send:', flush=True)
-        for k, v in _direct_headers.items():
-            if k == 'x-api-key':
-                print(f'  x-api-key = {v[:8]!r}...{v[-4:]!r}  len={len(v)}', flush=True)
-            else:
-                print(f'  {k} = {v!r}', flush=True)
-        _direct_payload = {
-            'model': 'claude-sonnet-4-6',
-            'max_tokens': 3000,
-            'system': WIKI_SYSTEM,
-            'messages': [{'role': 'user', 'content': user_msg}],
-        }
-        _direct_resp = _req.post(
-            'https://api.anthropic.com/v1/messages',
-            headers=_direct_headers,
-            json=_direct_payload,
-            timeout=120,
-        )
-        print(f'[DIRECT-TEST] status={_direct_resp.status_code}', flush=True)
-        if _direct_resp.status_code != 200:
-            print(f'[DIRECT-TEST] error body: {_direct_resp.text[:500]}', flush=True)
-            raise Exception(f'Claude API {_direct_resp.status_code}: {_direct_resp.text[:300]}')
-        raw = _direct_resp.json()['content'][0]['text']
-        # ── 直接测试结束 ──────────────────────────────────────────────────
+        raw = _llm_call(provider, api_key,
+                        [{'role': 'user', 'content': user_msg}],
+                        system=WIKI_SYSTEM, max_tokens=3000)
 
-        # 打印原始返回，便于在后端日志（cmd）里排查格式问题
-        print('\n' + '='*60)
-        print(f'[Wiki RAW] doc={doc_id}')
-        print(raw)
-        print('='*60 + '\n', flush=True)
-
-        repaired = _repair_json(raw)
         try:
-            wiki = json.loads(repaired)
+            wiki = _parse_wiki_json(raw)
         except json.JSONDecodeError as e:
             # JSON 解析失败：降级为纯文本 Wiki 保存，不报错
             print(f'[Wiki] JSON 解析失败（{e}），降级为纯文本模式', flush=True)
             wiki = {'_plaintext': True, 'thesis': raw}
 
     except Exception as e:
+        print(f'[Wiki EXCEPTION] {e}', flush=True)
         return jsonify({'error': f'生成失败：{e}'}), 500
 
     _save_wiki(doc_id, wiki)
@@ -503,9 +542,8 @@ def chat():
     if not message:
         return jsonify({'error': '请输入内容'}), 400
 
-    client, err = _get_client(provider, api_key)
-    if not client:
-        return jsonify({'error': f'模型未配置：{err}'}), 400
+    if not (api_key or _default_key(provider)):
+        return jsonify({'error': f'模型未配置：未配置 {provider} 的 API Key'}), 400
 
     if session_id not in _conversations:
         _conversations[session_id] = []
@@ -548,7 +586,7 @@ def chat():
         conv = _conversations[session_id]
 
     try:
-        reply = _call_llm(provider, client, conv, system=system)
+        reply = _llm_call(provider, api_key, conv, system=system)
         conv.append({'role': 'assistant', 'content': reply})
         return jsonify({'success': True, 'reply': reply, 'sources': sources})
     except Exception as e:
