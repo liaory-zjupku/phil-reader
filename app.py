@@ -415,12 +415,21 @@ def generate_wiki():
         raw = _call_llm(provider, client,
                         [{'role': 'user', 'content': user_msg}],
                         system=WIKI_SYSTEM, max_tokens=3000)
+
+        # 打印原始返回，便于在后端日志（cmd）里排查格式问题
+        print('\n' + '='*60)
+        print(f'[Wiki RAW] doc={doc_id}')
+        print(raw)
+        print('='*60 + '\n', flush=True)
+
         repaired = _repair_json(raw)
         try:
             wiki = json.loads(repaired)
         except json.JSONDecodeError as e:
-            # 修复仍失败时，把原始内容一并返回便于排查
-            return jsonify({'error': f'Wiki JSON 解析失败：{e}', 'raw': raw[:500]}), 500
+            # JSON 解析失败：降级为纯文本 Wiki 保存，不报错
+            print(f'[Wiki] JSON 解析失败（{e}），降级为纯文本模式', flush=True)
+            wiki = {'_plaintext': True, 'thesis': raw}
+
     except Exception as e:
         return jsonify({'error': f'生成失败：{e}'}), 500
 

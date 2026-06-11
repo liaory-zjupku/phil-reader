@@ -505,6 +505,14 @@ function closeWiki() {
 function toggleSec(hd) { hd.closest('.w-sec').classList.toggle('exp'); }
 
 function buildWikiHTML(w) {
+  // 降级模式：AI 返回了纯文本而非 JSON，直接展示原文
+  if (w._plaintext) {
+    return `<div class="w-thesis">
+      <div class="w-thesis-lbl" style="color:var(--rust)">纯文本模式（JSON 解析失败）</div>
+      <div class="w-thesis-txt" style="white-space:pre-wrap;font-size:12px">${esc(w.thesis)}</div>
+    </div>`;
+  }
+
   const parts = [];
 
   if (w.thesis)
