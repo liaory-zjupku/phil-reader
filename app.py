@@ -167,16 +167,27 @@ def _search(query: str, doc_ids: list | None = None, top_k: int = 6) -> list:
 
 # ── LLM client & caller ────────────────────────────────────────────────────────
 def _get_client(provider: str, api_key: str | None = None):
-    key = api_key or _default_key(provider)
+    key = (api_key or _default_key(provider) or '').strip()
+
+    # 调试：打印实际使用的 key 信息
+    print(f'[_get_client] provider={provider} '
+          f'key_prefix={key[:8]!r} key_len={len(key)} '
+          f'env_raw={os.environ.get("ANTHROPIC_API_KEY","(not set)")[:8]!r}',
+          flush=True)
+
     if not key:
         return None, f'未配置 {provider} 的 API Key'
-    ck = f'{provider}_{key[:8]}'
+
+    # 用完整 key 的哈希做缓存键，避免不同 key 前8位相同时命中错误缓存
+    import hashlib
+    ck = f'{provider}_{hashlib.md5(key.encode()).hexdigest()[:12]}'
     if ck in _clients:
         return _clients[ck], None
     try:
         cfg = MODEL_CONFIG[provider]
         if cfg['api_type'] == 'anthropic':
             from anthropic import Anthropic
+            print(f'[Anthropic] new client key={key[:8]!r} len={len(key)}', flush=True)
             c = Anthropic(api_key=key)
         else:
             from openai import OpenAI
