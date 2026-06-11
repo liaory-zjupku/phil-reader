@@ -99,41 +99,27 @@ def parse_pdf(filepath) -> tuple[list, int]:
     return chunks, len(reader.pages)
 
 def parse_epub(filepath) -> tuple[list, int]:
-    from ebooklib import epub
+    import zipfile
     from bs4 import BeautifulSoup
 
-    _HTML_TYPES = {'application/xhtml+xml', 'text/html', 'text/xml'}
-
-    book = epub.read_epub(str(filepath), options={'ignore_ncx': True})
-
-    # 1. 按 spine 读取顺序收集文档项（保证章节顺序正确）
-    doc_items = []
-    seen_ids = set()
-    for item_id, _ in book.spine:
-        item = book.get_item_with_id(item_id)
-        if item is not None and item.id not in seen_ids:
-            seen_ids.add(item.id)
-            doc_items.append(item)
-
-    # 2. 补充不在 spine 中的 HTML 文档项（部分 epub 内容不挂 spine）
-    for item in book.get_items():
-        if item.id not in seen_ids and (
-            item.media_type in _HTML_TYPES or item.get_type() == 9
-        ):
-            seen_ids.add(item.id)
-            doc_items.append(item)
-
     chunks, page_num = [], 0
-    for item in doc_items:
-        try:
-            soup = BeautifulSoup(item.get_content(), 'html.parser')
-            text = soup.get_text(separator='\n', strip=True)
-        except Exception:
-            continue
-        if len(text.strip()) < 20:
-            continue
-        page_num += 1
-        chunks.extend(_make_chunks(text, page_num))
+    with zipfile.ZipFile(str(filepath), 'r') as zf:
+        # 找出所有 html/xhtml 文件，按路径排序保证顺序稳定
+        html_names = sorted(
+            name for name in zf.namelist()
+            if name.lower().endswith(('.html', '.xhtml', '.htm'))
+        )
+        for name in html_names:
+            try:
+                raw = zf.read(name)
+                soup = BeautifulSoup(raw, 'html.parser')
+                text = soup.get_text(separator='\n', strip=True)
+            except Exception:
+                continue
+            if len(text.strip()) < 20:
+                continue
+            page_num += 1
+            chunks.extend(_make_chunks(text, page_num))
 
     return chunks, page_num
 
