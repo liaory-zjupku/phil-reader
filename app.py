@@ -19,21 +19,12 @@ for _d in [BASE_DIR, UPLOAD_DIR, WIKIS_DIR, CHUNKS_DIR]:
 app = Flask(__name__, static_folder='.')
 CORS(app)
 
-# ── 临时方案：直接硬编码 Claude Key（不要把填了真实值的 app.py 推送到 GitHub）──
-# 如果环境变量方式在部署平台不生效，在下面直接填入 Key 即可。
-DEFAULT_KEYS = {
-    "claude":   "",   # ← 在此填入真实 Key：sk-ant-...
-    "deepseek": "",
-    "qwen":     "",
-}
-# ─────────────────────────────────────────────────────────────────────────────
-
+# Claude 从环境变量 ANTHROPIC_API_KEY 读取（Railway 原生支持此变量名）
+# DeepSeek / 通义千问无默认 Key，用户在界面自行填入
 def _default_key(provider: str) -> str:
-    env_map = {"claude": "CLAUDE_KEY", "deepseek": "DEEPSEEK_KEY", "qwen": "QWEN_KEY"}
-    env_val = os.environ.get(env_map.get(provider, ""), "").strip()
-    if env_val:
-        return env_val
-    return DEFAULT_KEYS.get(provider, "").strip()
+    if provider == "claude":
+        return os.environ.get("ANTHROPIC_API_KEY", "").strip()
+    return ""
 
 MODEL_CONFIG = {
     "claude":   {"model": "claude-sonnet-4-6", "api_type": "anthropic"},
