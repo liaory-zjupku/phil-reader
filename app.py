@@ -19,13 +19,19 @@ for _d in [BASE_DIR, UPLOAD_DIR, WIKIS_DIR, CHUNKS_DIR]:
 app = Flask(__name__, static_folder='.')
 CORS(app)
 
-# Claude 从环境变量 CLAUDE_KEY 读取默认 Key，用户不填时自动使用。
-# DeepSeek / 通义千问无默认 Key，用户必须在界面自行填入才能使用。
-# 注意：不在模块级缓存，每次调用时实时读取，确保部署平台的环境变量始终生效。
+# ── 临时方案：直接硬编码 Claude Key（不要把填了真实值的 app.py 推送到 GitHub）──
+# 如果环境变量方式在部署平台不生效，在下面直接填入 Key 即可。
+DEFAULT_KEYS = {
+    "claude":   "",   # ← 在此填入真实 Key：sk-ant-...
+    "deepseek": "",
+    "qwen":     "",
+}
+# ─────────────────────────────────────────────────────────────────────────────
+
 def _default_key(provider: str) -> str:
-    if provider == 'claude':
-        return os.environ.get('CLAUDE_KEY', '')
-    return ''
+    # 优先读环境变量，读不到则用上方硬编码值
+    env_map = {"claude": "CLAUDE_KEY", "deepseek": "DEEPSEEK_KEY", "qwen": "QWEN_KEY"}
+    return os.environ.get(env_map.get(provider, ""), "") or DEFAULT_KEYS.get(provider, "")
 
 MODEL_CONFIG = {
     "claude":   {"model": "claude-sonnet-4-6", "api_type": "anthropic"},
