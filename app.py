@@ -1,4 +1,4 @@
-import os
+﻿import os
 import uuid
 import json
 import re
@@ -29,9 +29,11 @@ DEFAULT_KEYS = {
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _default_key(provider: str) -> str:
-    # 优先读环境变量，读不到则用上方硬编码值
     env_map = {"claude": "CLAUDE_KEY", "deepseek": "DEEPSEEK_KEY", "qwen": "QWEN_KEY"}
-    return os.environ.get(env_map.get(provider, ""), "") or DEFAULT_KEYS.get(provider, "")
+    env_val = os.environ.get(env_map.get(provider, ""), "").strip()
+    if env_val:
+        return env_val
+    return DEFAULT_KEYS.get(provider, "").strip()
 
 MODEL_CONFIG = {
     "claude":   {"model": "claude-sonnet-4-6", "api_type": "anthropic"},
@@ -287,17 +289,28 @@ def check_defaults():
 
 @app.route('/api/debug-env', methods=['GET'])
 def debug_env():
-    """诊断接口：确认 Railway 环境变量是否正确注入。确认后可删除此接口。"""
-    val = os.environ.get('CLAUDE_KEY', '')
-    # 只暴露 key 的长度和前4位，不暴露完整值
-    masked = (val[:4] + '…(' + str(len(val)) + 'chars)') if val else '(empty)'
-    # 列出所有包含 CLAUDE 或 KEY 的变量名（不含值）
-    related_names = [k for k in os.environ if 'CLAUDE' in k.upper() or 'KEY' in k.upper()]
+    def mask(s):
+        s = s.strip()
+        return f'{s[:4]}…({len(s)} chars)' if s else '(empty)'
+
+    hardcoded   = DEFAULT_KEYS.get('claude', '')
+    env_val     = os.environ.get('CLAUDE_KEY', '')
+    final       = _default_key('claude')
+
     return jsonify({
-        'CLAUDE_KEY_value':  masked,
-        'CLAUDE_KEY_present': 'CLAUDE_KEY' in os.environ,
-        '_default_key_result': bool(_default_key('claude')),
-        'related_env_names':  sorted(related_names),
+        # DEFAULT_KEYS 里硬编码的值
+        'A_hardcoded_len':    len(hardcoded.strip()),
+        'A_hardcoded_prefix': mask(hardcoded),
+        # 环境变量 CLAUDE_KEY 的原始值
+        'B_env_raw_len':      len(env_val),
+        'B_env_raw_prefix':   mask(env_val),
+        'B_env_present':      'CLAUDE_KEY' in os.environ,
+        # _default_key() 最终返回的值
+        'C_final_len':        len(final),
+        'C_final_prefix':     mask(final),
+        'C_final_ok':         bool(final),
+        # 所有含 CLAUDE 或 KEY 的环境变量名
+        'D_related_env_names': sorted(k for k in os.environ if 'CLAUDE' in k.upper() or 'KEY' in k.upper()),
     })
 
 @app.route('/api/set-key', methods=['POST'])
