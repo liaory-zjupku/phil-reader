@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: phil-reader
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn --bind 0.0.0.0:$PORT --timeout 300 --workers 1 app:app
+    envVars:
+      # 在 Render 控制台的 Environment 页填入你的 API Key
+      - key: CLAUDE_KEY
+        sync: false
+      - key: DEEPSEEK_KEY
+        sync: false
+      - key: QWEN_KEY
+        sync: false
+      # 持久化目录（需要 Render 付费 Disk，免费版重启后数据丢失）
+      - key: DATA_DIR
+        value: /data/meta
+      - key: UPLOAD_DIR
+        value: /data/uploads
+    # Disk 块（付费功能，免费版可删掉这三行，但重启后文献和 Wiki 会丢失）
+    disk:
+      name: phil-data
+      mountPath: /data
+      sizeGB: 1

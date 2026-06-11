@@ -1,0 +1,10 @@
+.claude/
+venv/
+__pycache__/
+*.pyc
+uploads/
+data/
+server.log
+server.err
+*.egg-info/
+.env

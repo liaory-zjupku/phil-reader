@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>诠释者 · 哲学文本深度阅读</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500;600;700&family=Noto+Sans+SC:wght@300;400;500&family=EB+Garamond:ital,wght@0,400;0,500;1,400&display=swap');
+
+:root {
+  --ink: #1a1410; --ink-soft: #3d3530; --ink-faint: #6b5f57;
+  --parchment: #f5f0e8; --parchment-dark: #ede5d4; --parchment-deep: #e0d4be;
+  --gold: #9a7d3a; --gold-light: #c4a55a; --gold-pale: rgba(154,125,58,0.09);
+  --rust: #8b3a2a; --green: #3a6b4a; --blue: #2a4a6b;
+  --border: #c8b89a; --shadow: rgba(26,20,16,0.10);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--parchment); color: var(--ink); font-family: 'Noto Sans SC', sans-serif; min-height: 100vh; display: flex; flex-direction: column; }
+
+/* ── Header ── */
+header { border-bottom: 1px solid var(--border); padding: 0 22px; background: rgba(245,240,232,0.97); backdrop-filter: blur(4px); position: sticky; top: 0; z-index: 100; display: flex; align-items: center; justify-content: space-between; height: 52px; flex-shrink: 0; }
+.logo { font-family: 'Noto Serif SC', serif; font-size: 17px; font-weight: 600; display: flex; align-items: center; gap: 9px; }
+.logo-mark { width: 27px; height: 27px; border: 1.5px solid var(--gold); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; color: var(--gold); }
+.logo-sub { font-family: 'EB Garamond', serif; font-size: 12px; color: var(--ink-faint); letter-spacing: 0.08em; }
+.header-right { display: flex; align-items: center; gap: 11px; }
+.key-indicator { font-size: 12px; color: var(--ink-faint); display: flex; align-items: center; gap: 5px; }
+.key-dot { width: 7px; height: 7px; border-radius: 50%; background: #ccc; transition: background 0.3s; }
+.key-dot.ok { background: var(--green); }
+.btn-ghost { padding: 5px 13px; border: 1px solid var(--border); border-radius: 20px; background: none; font-size: 12px; color: var(--ink-faint); cursor: pointer; font-family: 'Noto Sans SC', sans-serif; transition: all 0.2s; }
+.btn-ghost:hover { border-color: var(--gold); color: var(--gold); }
+
+/* ── Layout ── */
+.layout { display: flex; flex: 1; overflow: hidden; height: calc(100vh - 52px); }
+
+/* ── Sidebar ── */
+.sidebar { width: 236px; flex-shrink: 0; border-right: 1px solid var(--border); background: var(--parchment-dark); display: flex; flex-direction: column; overflow: hidden; }
+.sb-scroll { flex: 1; overflow-y: auto; }
+.sb-sec { padding: 11px 13px; border-bottom: 1px solid var(--border); }
+.sb-label { font-family: 'EB Garamond', serif; font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--gold); margin-bottom: 7px; }
+
+/* Model selector */
+.model-row { display: flex; gap: 4px; }
+.model-btn { flex: 1; padding: 5px 2px; border: 1px solid var(--border); border-radius: 3px; background: rgba(255,255,255,0.55); font-size: 10px; color: var(--ink-faint); cursor: pointer; text-align: center; font-family: 'Noto Sans SC', sans-serif; transition: all 0.2s; position: relative; }
+.model-btn.active { border-color: var(--gold); color: var(--gold); background: var(--gold-pale); }
+.model-badge { position: absolute; top: -3px; right: -3px; width: 7px; height: 7px; background: var(--green); border-radius: 50%; display: none; }
+.model-badge.show { display: block; }
+
+/* Key */
+.key-row { display: flex; gap: 5px; margin-top: 7px; }
+.key-input { flex: 1; padding: 5px 8px; border: 1px solid var(--border); border-radius: 3px; background: #fff; font-family: monospace; font-size: 10px; color: var(--ink); outline: none; }
+.key-input:focus { border-color: var(--gold); }
+.btn-sm { padding: 5px 9px; background: var(--gold); color: #fff; border: none; border-radius: 3px; font-size: 10px; cursor: pointer; white-space: nowrap; }
+.btn-sm:hover { background: var(--gold-light); }
+.key-note { font-size: 10px; color: var(--ink-faint); margin-top: 5px; line-height: 1.5; }
+.key-note.ok { color: var(--green); }
+
+/* Upload */
+.upload-area { border: 1.5px dashed var(--border); border-radius: 4px; padding: 10px; text-align: center; cursor: pointer; transition: all 0.2s; background: rgba(255,255,255,0.35); }
+.upload-area:hover, .upload-area.drag { border-color: var(--gold); background: var(--gold-pale); }
+.upload-area input { display: none; }
+.upload-icon { font-size: 18px; margin-bottom: 3px; }
+.upload-text { font-size: 10px; color: var(--ink-faint); line-height: 1.5; }
+.upload-prog { font-size: 10px; color: var(--gold); margin-top: 5px; display: none; }
+
+/* Background */
+.bg-input { width: 100%; padding: 5px 8px; border: 1px solid var(--border); border-radius: 3px; background: rgba(255,255,255,0.6); font-family: 'Noto Sans SC', sans-serif; font-size: 11px; color: var(--ink); outline: none; }
+.bg-input:focus { border-color: var(--gold); }
+.bg-input::placeholder { color: var(--ink-faint); opacity: 0.7; }
+
+/* Doc list */
+.doc-empty { font-size: 11px; color: var(--ink-faint); text-align: center; padding: 18px 8px; line-height: 1.7; }
+.doc-card { padding: 8px 10px; background: rgba(255,255,255,0.65); border: 1px solid var(--border); border-radius: 4px; margin-bottom: 6px; }
+.doc-card-top { display: flex; align-items: flex-start; gap: 6px; }
+.doc-name { flex: 1; font-size: 11px; color: var(--ink); font-family: 'Noto Serif SC', serif; word-break: break-all; line-height: 1.4; }
+.doc-del { background: none; border: none; color: var(--ink-faint); cursor: pointer; font-size: 14px; padding: 0 2px; flex-shrink: 0; line-height: 1; }
+.doc-del:hover { color: var(--rust); }
+.doc-meta { font-size: 10px; color: var(--ink-faint); margin-top: 2px; }
+.doc-actions { display: flex; gap: 5px; margin-top: 6px; }
+.btn-wiki { flex: 1; padding: 3px 5px; border: 1px solid var(--border); border-radius: 3px; background: none; font-size: 10px; color: var(--ink-faint); cursor: pointer; font-family: 'Noto Sans SC', sans-serif; transition: all 0.2s; text-align: center; }
+.btn-wiki:hover:not(:disabled) { border-color: var(--gold); color: var(--gold); }
+.btn-wiki.ready { border-color: var(--gold); color: var(--gold); background: var(--gold-pale); }
+.btn-wiki:disabled { opacity: 0.55; cursor: not-allowed; }
+
+/* ── Main chat ── */
+.main { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
+.chat-area { flex: 1; overflow-y: auto; padding: 20px 26px; display: flex; flex-direction: column; gap: 16px; }
+
+/* Welcome */
+.welcome { display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1; text-align: center; padding: 40px 20px; }
+.welcome-glyph { font-family: 'EB Garamond', serif; font-size: 54px; opacity: 0.18; margin-bottom: 14px; line-height: 1; }
+.welcome h2 { font-family: 'Noto Serif SC', serif; font-size: 19px; color: var(--ink); font-weight: 500; margin-bottom: 8px; }
+.welcome p { font-size: 13px; line-height: 1.85; max-width: 340px; color: var(--ink-faint); }
+.tip-chips { margin-top: 16px; display: flex; gap: 7px; flex-wrap: wrap; justify-content: center; }
+.tip-chip { padding: 5px 12px; background: rgba(255,255,255,0.8); border: 1px solid var(--border); border-radius: 20px; font-size: 11px; color: var(--ink-soft); cursor: pointer; transition: all 0.2s; }
+.tip-chip:hover { border-color: var(--gold); color: var(--gold); }
+
+/* Messages */
+.msg { max-width: 88%; animation: fadeSlide 0.22s ease; }
+@keyframes fadeSlide { from { opacity: 0; transform: translateY(7px); } to { opacity: 1; transform: translateY(0); } }
+.msg-user { align-self: flex-end; }
+.msg-asst { align-self: flex-start; }
+.bubble-user { background: var(--ink); color: var(--parchment); padding: 11px 16px; border-radius: 16px 16px 4px 16px; font-size: 14px; line-height: 1.75; }
+.bubble-asst { background: #fff; border: 1px solid var(--border); padding: 14px 18px; border-radius: 16px 16px 16px 4px; font-size: 14px; line-height: 1.9; color: var(--ink-soft); box-shadow: 0 1px 4px var(--shadow); }
+.bubble-asst p { margin-bottom: 8px; }
+.bubble-asst p:last-child { margin-bottom: 0; }
+.bubble-asst strong { color: var(--ink); }
+.bubble-asst em { color: var(--ink-soft); }
+.bubble-asst code { background: var(--parchment-dark); padding: 1px 4px; border-radius: 3px; font-size: 12px; }
+.bubble-sys { background: var(--parchment-dark); border: 1px dashed var(--border); padding: 7px 13px; border-radius: 5px; font-size: 12px; color: var(--ink-faint); }
+.msg-footer { display: flex; align-items: center; justify-content: flex-end; margin-top: 4px; }
+.msg-tag { font-size: 10px; color: var(--ink-faint); font-family: 'EB Garamond', serif; }
+
+/* Source chips */
+.source-chips { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 9px; border-top: 1px dashed var(--border); padding-top: 7px; }
+.src-chip { position: relative; }
+.src-chip-btn { font-size: 10px; padding: 2px 8px; background: var(--gold-pale); border: 1px solid var(--gold-light); border-radius: 3px; color: var(--gold); font-family: 'EB Garamond', serif; cursor: pointer; transition: background 0.15s; }
+.src-chip-btn:hover { background: rgba(154,125,58,0.17); }
+.cite-box { display: none; position: absolute; bottom: calc(100% + 6px); left: 0; width: 290px; background: #fff; border: 1px solid var(--border); border-radius: 6px; box-shadow: 0 4px 16px var(--shadow); padding: 10px; z-index: 30; }
+.cite-box.open { display: block; }
+.cite-text { font-size: 12px; color: var(--ink-soft); line-height: 1.7; max-height: 110px; overflow-y: auto; border-left: 2px solid var(--gold-light); padding-left: 8px; margin-bottom: 7px; font-family: 'Noto Serif SC', serif; }
+.btn-insert { font-size: 11px; padding: 4px 10px; background: var(--gold); color: #fff; border: none; border-radius: 3px; cursor: pointer; }
+.btn-insert:hover { background: var(--gold-light); }
+
+/* Typing */
+.typing { align-self: flex-start; display: none; }
+.typing.on { display: block; }
+.typing-bubble { background: #fff; border: 1px solid var(--border); padding: 11px 16px; border-radius: 16px 16px 16px 4px; display: flex; gap: 5px; align-items: center; }
+.dot { width: 6px; height: 6px; background: var(--ink-faint); border-radius: 50%; animation: bounce 1.2s infinite; }
+.dot:nth-child(2) { animation-delay: 0.2s; }
+.dot:nth-child(3) { animation-delay: 0.4s; }
+@keyframes bounce { 0%,60%,100% { transform: translateY(0); } 30% { transform: translateY(-5px); } }
+
+/* Input */
+.input-area { border-top: 1px solid var(--border); padding: 11px 20px; background: rgba(255,255,255,0.9); flex-shrink: 0; }
+.input-row { display: flex; gap: 8px; align-items: flex-end; }
+textarea.chat-input { flex: 1; padding: 10px 14px; border: 1px solid var(--border); border-radius: 18px; background: var(--parchment); font-family: 'Noto Sans SC', sans-serif; font-size: 14px; line-height: 1.6; color: var(--ink); resize: none; outline: none; min-height: 42px; max-height: 120px; transition: border-color 0.2s; }
+textarea.chat-input:focus { border-color: var(--gold); }
+textarea.chat-input::placeholder { color: var(--ink-faint); opacity: 0.7; }
+.btn-send { width: 42px; height: 42px; border-radius: 50%; background: var(--ink); color: var(--parchment); border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 16px; transition: background 0.2s; flex-shrink: 0; }
+.btn-send:hover { background: var(--ink-soft); }
+.btn-send:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ── Wiki panel ── */
+.wiki-overlay { display: none; position: fixed; top: 52px; left: 0; right: 0; bottom: 0; background: rgba(26,20,16,0.22); z-index: 40; }
+.wiki-overlay.on { display: block; }
+.wiki-panel { position: fixed; top: 52px; right: -450px; width: 440px; height: calc(100vh - 52px); background: var(--parchment-dark); border-left: 1px solid var(--border); transition: right 0.3s cubic-bezier(0.25,0.46,0.45,0.94); overflow-y: auto; z-index: 50; }
+.wiki-panel.open { right: 0; }
+.wiki-ph { padding: 13px 15px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 8px; position: sticky; top: 0; background: var(--parchment-dark); z-index: 1; }
+.wiki-ph-title { font-family: 'Noto Serif SC', serif; font-size: 13px; font-weight: 600; color: var(--ink); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.btn-close { background: none; border: 1px solid var(--border); border-radius: 50%; width: 25px; height: 25px; display: flex; align-items: center; justify-content: center; cursor: pointer; color: var(--ink-faint); font-size: 13px; flex-shrink: 0; }
+.btn-close:hover { border-color: var(--rust); color: var(--rust); }
+.wiki-body { padding: 14px; }
+
+/* Wiki content */
+.w-thesis { background: rgba(154,125,58,0.07); border: 1px solid var(--gold-light); border-radius: 6px; padding: 13px 15px; margin-bottom: 14px; }
+.w-thesis-lbl { font-family: 'EB Garamond', serif; font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--gold); margin-bottom: 5px; }
+.w-thesis-txt { font-family: 'Noto Serif SC', serif; font-size: 13px; line-height: 1.85; color: var(--ink); }
+
+.w-sec { margin-bottom: 10px; border: 1px solid var(--border); border-radius: 5px; overflow: hidden; }
+.w-sec-hd { padding: 8px 13px; background: var(--parchment-deep); cursor: pointer; display: flex; align-items: center; justify-content: space-between; user-select: none; }
+.w-sec-hd:hover { background: var(--parchment-deep); filter: brightness(0.97); }
+.w-sec-title { font-family: 'EB Garamond', serif; font-size: 12px; letter-spacing: 0.08em; color: var(--ink-soft); }
+.w-arrow { font-size: 9px; color: var(--ink-faint); transition: transform 0.2s; }
+.w-sec.exp .w-arrow { transform: rotate(180deg); }
+.w-sec-bd { display: none; padding: 10px 13px; background: rgba(255,255,255,0.45); }
+.w-sec.exp .w-sec-bd { display: block; }
+
+/* Chapter */
+.ch-item { padding: 7px 0; border-bottom: 1px dashed var(--border); }
+.ch-item:last-child { border-bottom: none; }
+.ch-title { font-family: 'Noto Serif SC', serif; font-size: 12px; font-weight: 600; color: var(--ink); margin-bottom: 2px; }
+.ch-summary { font-size: 11px; color: var(--ink-soft); line-height: 1.6; margin-bottom: 2px; }
+.ch-claim { font-size: 11px; color: var(--gold); font-style: italic; font-family: 'EB Garamond', serif; }
+
+/* Concepts */
+.cc-card { background: rgba(255,255,255,0.65); border: 1px solid var(--border); border-left: 3px solid var(--gold); border-radius: 3px; padding: 8px 10px; margin-bottom: 7px; }
+.cc-card:last-child { margin-bottom: 0; }
+.cc-term { font-family: 'Noto Serif SC', serif; font-size: 12px; font-weight: 600; color: var(--ink); margin-bottom: 2px; }
+.cc-def { font-size: 11px; color: var(--ink-soft); line-height: 1.6; }
+.cc-tags { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 4px; }
+.cc-tag { font-size: 9px; padding: 1px 6px; background: var(--gold-pale); border: 1px solid var(--gold-light); border-radius: 10px; color: var(--gold); }
+
+/* Figures */
+.fig-item { padding: 7px 0; border-bottom: 1px dashed var(--border); }
+.fig-item:last-child { border-bottom: none; }
+.fig-name { font-family: 'Noto Serif SC', serif; font-size: 12px; font-weight: 600; color: var(--blue); }
+.fig-role { font-size: 11px; color: var(--ink-soft); line-height: 1.5; }
+.fig-rel { font-size: 10px; color: var(--ink-faint); font-style: italic; margin-top: 1px; }
+
+/* Sources */
+.src-item { padding: 6px 0; border-bottom: 1px dashed var(--border); }
+.src-item:last-child { border-bottom: none; }
+.src-name { font-family: 'Noto Serif SC', serif; font-size: 12px; color: var(--ink); }
+.src-inf { font-size: 11px; color: var(--ink-soft); line-height: 1.5; }
+
+/* Prerequisites */
+.pre-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+.pre-chip { padding: 3px 10px; background: rgba(42,74,107,0.07); border: 1px solid rgba(42,74,107,0.2); border-radius: 12px; font-size: 11px; color: var(--blue); }
+
+/* Problems */
+.pb-item { padding: 7px 0; border-bottom: 1px dashed var(--border); }
+.pb-item:last-child { border-bottom: none; }
+.pb-q { font-family: 'Noto Serif SC', serif; font-size: 12px; color: var(--rust); margin-bottom: 2px; }
+.pb-ans { font-size: 11px; color: var(--ink-soft); line-height: 1.5; }
+
+/* Toast */
+.toast { position: fixed; bottom: 76px; left: 50%; transform: translateX(-50%); padding: 9px 18px; background: var(--rust); color: #fff; border-radius: 6px; font-size: 13px; display: none; z-index: 300; box-shadow: 0 4px 14px rgba(0,0,0,0.2); max-width: 85%; text-align: center; }
+.toast.on { display: block; }
+
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-mark">诠</div>
+    诠释者
+    <span class="logo-sub">LLM Wiki Reader</span>
+  </div>
+  <div class="header-right">
+    <button class="btn-ghost" onclick="newSession()">+ 新对话</button>
+    <div class="key-indicator">
+      <div class="key-dot" id="keyDot"></div>
+      <span id="keyLabel">未连接</span>
+    </div>
+  </div>
+</header>
+
+<div class="layout">
+  <aside class="sidebar">
+    <div class="sb-scroll">
+
+      <!-- Model & Key -->
+      <div class="sb-sec">
+        <div class="sb-label">选择模型</div>
+        <div class="model-row">
+          <button class="model-btn active" id="btn-claude"   onclick="selectModel('claude',this)">
+            Claude<div class="model-badge" id="badge-claude"></div></button>
+          <button class="model-btn"        id="btn-deepseek" onclick="selectModel('deepseek',this)">
+            DeepSeek<div class="model-badge" id="badge-deepseek"></div></button>
+          <button class="model-btn"        id="btn-qwen"     onclick="selectModel('qwen',this)">
+            千问<div class="model-badge" id="badge-qwen"></div></button>
+        </div>
+        <div class="key-row">
+          <input type="password" class="key-input" id="keyInput" placeholder="API Key…" />
+          <button class="btn-sm" onclick="saveKey()">保存</button>
+        </div>
+        <div class="key-note" id="keyNote">请填入对应模型的 API Key</div>
+      </div>
+
+      <!-- Reader background -->
+      <div class="sb-sec">
+        <div class="sb-label">读者背景</div>
+        <input type="text" class="bg-input" id="userBg" placeholder="如：哲学大一，初学解释学" />
+      </div>
+
+      <!-- Upload -->
+      <div class="sb-sec">
+        <div class="sb-label">上传文献</div>
+        <div class="upload-area" id="uploadArea"
+          onclick="document.getElementById('fileInput').click()"
+          ondragover="event.preventDefault();this.classList.add('drag')"
+          ondragleave="this.classList.remove('drag')"
+          ondrop="event.preventDefault();this.classList.remove('drag');uploadFile(event.dataTransfer.files[0])">
+          <input type="file" id="fileInput" accept=".pdf,.epub,.docx,.txt,.md"
+            onchange="uploadFile(this.files[0])" />
+          <div class="upload-icon">📄</div>
+          <div class="upload-text">PDF · EPUB · DOCX · TXT</div>
+        </div>
+        <div class="upload-prog" id="uploadProg"></div>
+      </div>
+
+      <!-- Doc list -->
+      <div class="sb-sec" style="border-bottom:none;padding-bottom:4px">
+        <div class="sb-label">已加载文献 <span id="docCount"></span></div>
+        <div id="docList"><div class="doc-empty">上传文献后开始阅读</div></div>
+      </div>
+
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="chat-area" id="chatArea">
+      <div class="welcome" id="welcome">
+        <div class="welcome-glyph">§</div>
+        <h2>读懂文本，读透思想</h2>
+        <p>上传文献后开始对话。可先生成 Wiki 总览，再分层深读。</p>
+        <div class="tip-chips">
+          <div class="tip-chip" onclick="useTip('这段文本的问题意识是什么？')">问题意识</div>
+          <div class="tip-chip" onclick="useTip('帮我补充需要的前置知识')">前置知识</div>
+          <div class="tip-chip" onclick="useTip('拆解一下核心论证结构')">论证拆解</div>
+          <div class="tip-chip" onclick="useTip('这个观点在哲学史上的来源是什么？')">思想溯源</div>
+        </div>
+      </div>
+    </div>
+    <div class="typing" id="typing">
+      <div class="typing-bubble">
+        <div class="dot"></div><div class="dot"></div><div class="dot"></div>
+      </div>
+    </div>
+    <div class="input-area">
+      <div class="input-row">
+        <textarea class="chat-input" id="chatInput" rows="1"
+          placeholder="粘贴文段、提问、或追问……"
+          onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMessage()}"
+          oninput="autoResize(this)"></textarea>
+        <button class="btn-send" id="sendBtn" onclick="sendMessage()">➤</button>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- Wiki slide-over -->
+<div class="wiki-overlay" id="wikiOverlay" onclick="closeWiki()"></div>
+<div class="wiki-panel" id="wikiPanel">
+  <div class="wiki-ph">
+    <div class="wiki-ph-title" id="wikiTitle"></div>
+    <button class="btn-close" onclick="closeWiki()">×</button>
+  </div>
+  <div class="wiki-body" id="wikiBody"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── State ─────────────────────────────────────────────────────────────────────
+const S = {
+  sid: null,
+  provider: 'claude',
+  keys: { claude:'', deepseek:'', qwen:'' },
+  defaults: { claude:false, deepseek:false, qwen:false },
+  docs: {},
+  sending: false,
+  genWiki: new Set(),
+};
+const _cites = {};  // id -> source obj
+
+// ── Boot ──────────────────────────────────────────────────────────────────────
+window.addEventListener('load', async () => {
+  try { Object.assign(S.keys, JSON.parse(localStorage.getItem('phil_keys') || '{}')); } catch(e){}
+  document.getElementById('keyInput').value = S.keys[S.provider] || '';
+  await Promise.all([checkDefaults(), loadDocs(), newSession()]);
+  for (const [p, k] of Object.entries(S.keys)) {
+    if (k) post('/api/set-key', {provider:p, api_key:k}).catch(()=>{});
+  }
+});
+
+async function checkDefaults() {
+  try {
+    const d = await get('/api/check-defaults');
+    S.defaults = d.available;
+    for (const [p, ok] of Object.entries(d.available)) {
+      if (ok) document.getElementById('badge-'+p).classList.add('show');
+    }
+    updateKeyUI();
+  } catch(e){}
+}
+
+async function loadDocs() {
+  try {
+    const d = await get('/api/documents');
+    S.docs = {};
+    (d.documents||[]).forEach(doc => { S.docs[doc.id] = doc; });
+    renderDocs();
+  } catch(e){}
+}
+
+// ── Model / Key ───────────────────────────────────────────────────────────────
+function selectModel(p, el) {
+  S.provider = p;
+  document.querySelectorAll('.model-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('keyInput').value = S.keys[p] || '';
+  updateKeyUI();
+}
+
+function updateKeyUI() {
+  const p = S.provider;
+  const note = document.getElementById('keyNote');
+  const dot  = document.getElementById('keyDot');
+  const lbl  = document.getElementById('keyLabel');
+  if (S.defaults[p]) {
+    note.textContent = '✓ 已预配置，可直接使用'; note.className = 'key-note ok';
+    dot.className = 'key-dot ok'; lbl.textContent = p;
+  } else if (S.keys[p]) {
+    note.textContent = '✓ 已设置自定义 Key'; note.className = 'key-note ok';
+    dot.className = 'key-dot ok'; lbl.textContent = p;
+  } else {
+    note.textContent = '请填入 ' + p + ' 的 API Key'; note.className = 'key-note';
+    dot.className = 'key-dot'; lbl.textContent = '未连接';
+  }
+}
+
+async function saveKey() {
+  const key = document.getElementById('keyInput').value.trim();
+  S.keys[S.provider] = key;
+  localStorage.setItem('phil_keys', JSON.stringify(S.keys));
+  try { await post('/api/set-key', {provider:S.provider, api_key:key}); } catch(e){}
+  updateKeyUI();
+}
+
+// ── Upload ────────────────────────────────────────────────────────────────────
+async function uploadFile(file) {
+  if (!file) return;
+  const prog = document.getElementById('uploadProg');
+  prog.style.display = 'block';
+  prog.textContent = `解析中：${file.name}…`;
+  const fd = new FormData();
+  fd.append('file', file);
+  try {
+    const resp = await fetch('/api/upload', {method:'POST', body:fd});
+    const d = await resp.json();
+    prog.style.display = 'none';
+    if (d.success) {
+      S.docs[d.id] = d;
+      renderDocs();
+      sysMsg(`已加载「${d.name}」（${d.pages} 页，${d.chunks_count} 片段）`);
+    } else { showErr(d.error); }
+  } catch(e) { prog.style.display='none'; showErr('上传失败：'+e.message); }
+  document.getElementById('fileInput').value = '';
+}
+
+function renderDocs() {
+  const list = document.getElementById('docList');
+  const ids  = Object.keys(S.docs);
+  document.getElementById('docCount').textContent = ids.length ? `（${ids.length}）` : '';
+  if (!ids.length) { list.innerHTML = '<div class="doc-empty">上传文献后开始阅读</div>'; return; }
+  list.innerHTML = ids.map(id => {
+    const doc = S.docs[id];
+    let wBtn;
+    if (doc.has_wiki)
+      wBtn = `<button class="btn-wiki ready" onclick="openWiki('${id}')">Wiki ✓ 查看</button>`;
+    else if (S.genWiki.has(id))
+      wBtn = `<button class="btn-wiki" disabled>生成中…</button>`;
+    else
+      wBtn = `<button class="btn-wiki" onclick="generateWiki('${id}')">生成 Wiki</button>`;
+    return `<div class="doc-card" id="dcard-${id}">
+      <div class="doc-card-top">
+        <div class="doc-name" title="${esc(doc.name)}">${esc(doc.name)}</div>
+        <button class="doc-del" onclick="deleteDoc('${id}')">×</button>
+      </div>
+      <div class="doc-meta">${doc.pages} 页 · ${doc.chunks_count} 片段</div>
+      <div class="doc-actions">${wBtn}</div>
+    </div>`;
+  }).join('');
+}
+
+async function deleteDoc(id) {
+  try {
+    await post('/api/delete-doc', {doc_id:id});
+    delete S.docs[id];
+    renderDocs();
+  } catch(e) { showErr('删除失败'); }
+}
+
+// ── Wiki ──────────────────────────────────────────────────────────────────────
+async function generateWiki(id) {
+  if (S.genWiki.has(id)) return;
+  S.genWiki.add(id);
+  renderDocs();
+  try {
+    const d = await post('/api/generate-wiki', {
+      doc_id:id, provider:S.provider, api_key:S.keys[S.provider]||''
+    });
+    if (d.success) {
+      S.docs[id].has_wiki = true;
+      S.genWiki.delete(id);
+      renderDocs();
+      sysMsg(`「${S.docs[id].name}」Wiki 已生成`);
+      openWikiWith(id, d.wiki);
+    } else {
+      S.genWiki.delete(id);
+      renderDocs();
+      showErr(d.error || 'Wiki 生成失败');
+    }
+  } catch(e) {
+    S.genWiki.delete(id);
+    renderDocs();
+    showErr('Wiki 生成失败：'+e.message);
+  }
+}
+
+async function openWiki(id) {
+  try {
+    const d = await get('/api/wiki/'+id);
+    if (d.wiki) openWikiWith(id, d.wiki);
+  } catch(e) { showErr('加载 Wiki 失败'); }
+}
+
+function openWikiWith(id, wiki) {
+  document.getElementById('wikiTitle').textContent = S.docs[id]?.name || 'Wiki';
+  document.getElementById('wikiBody').innerHTML  = buildWikiHTML(wiki);
+  document.getElementById('wikiPanel').classList.add('open');
+  document.getElementById('wikiOverlay').classList.add('on');
+}
+
+function closeWiki() {
+  document.getElementById('wikiPanel').classList.remove('open');
+  document.getElementById('wikiOverlay').classList.remove('on');
+}
+
+function toggleSec(hd) { hd.closest('.w-sec').classList.toggle('exp'); }
+
+function buildWikiHTML(w) {
+  const parts = [];
+
+  if (w.thesis)
+    parts.push(`<div class="w-thesis"><div class="w-thesis-lbl">整体论点</div><div class="w-thesis-txt">${esc(w.thesis)}</div></div>`);
+
+  if (w.chapter_structure?.length)
+    parts.push(sec('章节结构', w.chapter_structure.map(c => `
+      <div class="ch-item">
+        <div class="ch-title">${esc(c.title||'')}</div>
+        <div class="ch-summary">${esc(c.summary||'')}</div>
+        ${c.key_claim?`<div class="ch-claim">"${esc(c.key_claim)}"</div>`:''}
+      </div>`).join(''), true));
+
+  if (w.core_concepts?.length)
+    parts.push(sec('核心概念', w.core_concepts.map(c => {
+      const tags = (c.related||[]).map(r=>`<span class="cc-tag">${esc(r)}</span>`).join('');
+      return `<div class="cc-card">
+        <div class="cc-term">${esc(c.term||'')}</div>
+        <div class="cc-def">${esc(c.definition||'')}</div>
+        ${tags?`<div class="cc-tags">${tags}</div>`:''}
+      </div>`;
+    }).join(''), true));
+
+  if (w.key_figures?.length)
+    parts.push(sec('关键人物', w.key_figures.map(f => `
+      <div class="fig-item">
+        <div class="fig-name">${esc(f.name||'')}</div>
+        <div class="fig-role">${esc(f.role||'')}</div>
+        ${f.relation?`<div class="fig-rel">${esc(f.relation)}</div>`:''}
+      </div>`).join('')));
+
+  if (w.intellectual_sources?.length)
+    parts.push(sec('思想来源', w.intellectual_sources.map(s => `
+      <div class="src-item">
+        <div class="src-name">${esc(s.source||'')}</div>
+        <div class="src-inf">${esc(s.influence||'')}</div>
+      </div>`).join('')));
+
+  if (w.prerequisites?.length)
+    parts.push(sec('前置知识', `<div class="pre-chips">${
+      w.prerequisites.map(p=>`<span class="pre-chip">${esc(p)}</span>`).join('')
+    }</div>`));
+
+  if (w.philosophical_problems?.length)
+    parts.push(sec('哲学史问题', w.philosophical_problems.map(p => `
+      <div class="pb-item">
+        <div class="pb-q">${esc(p.problem||'')}</div>
+        <div class="pb-ans">${esc(p.treatment||'')}</div>
+      </div>`).join('')));
+
+  return parts.join('');
+}
+
+function sec(title, body, expanded=false) {
+  return `<div class="w-sec${expanded?' exp':''}">
+    <div class="w-sec-hd" onclick="toggleSec(this)">
+      <span class="w-sec-title">${title}</span>
+      <span class="w-arrow">▼</span>
+    </div>
+    <div class="w-sec-bd">${body}</div>
+  </div>`;
+}
+
+// ── Chat ──────────────────────────────────────────────────────────────────────
+async function newSession() {
+  try {
+    const d = await post('/api/new-session', {});
+    S.sid = d.session_id;
+    const area = document.getElementById('chatArea');
+    area.innerHTML = `<div class="welcome" id="welcome">
+      <div class="welcome-glyph">§</div>
+      <h2>读懂文本，读透思想</h2>
+      <p>上传文献后开始对话。可先生成 Wiki 总览，再分层深读。</p>
+      <div class="tip-chips">
+        <div class="tip-chip" onclick="useTip('这段文本的问题意识是什么？')">问题意识</div>
+        <div class="tip-chip" onclick="useTip('帮我补充需要的前置知识')">前置知识</div>
+        <div class="tip-chip" onclick="useTip('拆解一下核心论证结构')">论证拆解</div>
+        <div class="tip-chip" onclick="useTip('这个观点在哲学史上的来源是什么？')">思想溯源</div>
+      </div></div>`;
+  } catch(e){}
+}
+
+async function sendMessage() {
+  if (S.sending) return;
+  const inp  = document.getElementById('chatInput');
+  const text = inp.value.trim();
+  if (!text) return;
+  inp.value = '';
+  autoResize(inp);
+  rmWelcome();
+  addUserMsg(text);
+  S.sending = true;
+  document.getElementById('sendBtn').disabled = true;
+  document.getElementById('typing').classList.add('on');
+  scrollChat();
+  try {
+    const d = await post('/api/chat', {
+      message: text, session_id: S.sid,
+      provider: S.provider, api_key: S.keys[S.provider]||'',
+      user_bg: document.getElementById('userBg').value.trim(),
+      doc_ids: Object.keys(S.docs),
+    });
+    document.getElementById('typing').classList.remove('on');
+    if (d.success) addAsstMsg(d.reply, d.sources);
+    else showErr(d.error);
+  } catch(e) {
+    document.getElementById('typing').classList.remove('on');
+    showErr('连接失败：'+e.message);
+  } finally {
+    S.sending = false;
+    document.getElementById('sendBtn').disabled = false;
+  }
+}
+
+function rmWelcome() {
+  const w = document.getElementById('welcome');
+  if (w) w.remove();
+}
+
+function addUserMsg(text) {
+  rmWelcome();
+  appendMsg('msg-user', `<div class="bubble-user">${esc(text)}</div>`);
+}
+
+function addAsstMsg(text, sources) {
+  let sourceHTML = '';
+  if (sources?.length) {
+    const chips = sources.map(s => {
+      const cid = 'c' + Math.random().toString(36).slice(2,9);
+      _cites[cid] = s;
+      return `<div class="src-chip">
+        <button class="src-chip-btn" onclick="toggleCite('${cid}-box')">${esc(s.name)} p.${s.page}</button>
+        <div class="cite-box" id="${cid}-box">
+          <div class="cite-text">${esc(s.text)}</div>
+          <button class="btn-insert" onclick="insertCite('${cid}')">插入引用</button>
+        </div>
+      </div>`;
+    }).join('');
+    sourceHTML = `<div class="source-chips">${chips}</div>`;
+  }
+  appendMsg('msg-asst', `<div class="bubble-asst">${fmtMD(text)}${sourceHTML}</div>
+    <div class="msg-footer"><span class="msg-tag">${S.provider}</span></div>`);
+}
+
+function sysMsg(text) {
+  rmWelcome();
+  appendMsg('msg-asst', `<div class="bubble-sys">${esc(text)}</div>`);
+}
+
+function appendMsg(cls, inner) {
+  const el = document.createElement('div');
+  el.className = 'msg ' + cls;
+  el.innerHTML = inner;
+  document.getElementById('chatArea').appendChild(el);
+  scrollChat();
+}
+
+function useTip(text) { document.getElementById('chatInput').value = text; sendMessage(); }
+
+// ── Citations ─────────────────────────────────────────────────────────────────
+function toggleCite(boxId) {
+  const box = document.getElementById(boxId);
+  if (!box) return;
+  document.querySelectorAll('.cite-box.open').forEach(b => { if(b.id!==boxId) b.classList.remove('open'); });
+  box.classList.toggle('open');
+}
+
+function insertCite(cid) {
+  const s = _cites[cid];
+  if (!s) return;
+  const inp = document.getElementById('chatInput');
+  inp.value = `[引用：${s.name} 第${s.page}页]\n${s.text}\n\n` + inp.value;
+  autoResize(inp);
+  inp.focus();
+  document.querySelectorAll('.cite-box.open').forEach(b => b.classList.remove('open'));
+}
+
+// ── Utils ─────────────────────────────────────────────────────────────────────
+function esc(s) {
+  return String(s||'')
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function fmtMD(text) {
+  return esc(text)
+    .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g,'<em>$1</em>')
+    .replace(/`(.+?)`/g,'<code>$1</code>')
+    .replace(/\n\n/g,'</p><p>').replace(/\n/g,'<br>')
+    .replace(/^/,'<p>').replace(/$/,'</p>');
+}
+
+function autoResize(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight,120)+'px';
+}
+
+function scrollChat() {
+  const a = document.getElementById('chatArea');
+  a.scrollTop = a.scrollHeight;
+}
+
+function showErr(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('on');
+  setTimeout(() => t.classList.remove('on'), 4000);
+}
+
+async function get(url) {
+  const r = await fetch(url);
+  const d = await r.json();
+  if (!r.ok) throw new Error(d.error||'请求失败');
+  return d;
+}
+
+async function post(url, body) {
+  const r = await fetch(url, {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify(body),
+  });
+  const d = await r.json();
+  if (!r.ok) throw new Error(d.error||'请求失败');
+  return d;
+}
+</script>
+</body>
+</html>
