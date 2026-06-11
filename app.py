@@ -19,21 +19,12 @@ for _d in [BASE_DIR, UPLOAD_DIR, WIKIS_DIR, CHUNKS_DIR]:
 app = Flask(__name__, static_folder='.')
 CORS(app)
 
-# ══════════════════════════════════════════════════════════════════════════════
-# 默认 API Key 配置（填入后别人打开直接可用，无需自己填 Key）
-# 云端部署时环境变量优先；本地直接在这里填即可。
-# ══════════════════════════════════════════════════════════════════════════════
-_HARDCODED_KEYS = {
-    "claude":   "",   # 填入 Anthropic Key：sk-ant-...
-    "deepseek": "",   # 填入 DeepSeek Key：sk-...
-    "qwen":     "",   # 填入通义千问 Key：sk-...
-}
-# ══════════════════════════════════════════════════════════════════════════════
-
-# 环境变量覆盖硬编码（云端部署时在控制台设置，不影响本地配置）
+# Claude 从环境变量 CLAUDE_KEY 读取默认 Key，用户不填时自动使用。
+# DeepSeek / 通义千问无默认 Key，用户必须在界面自行填入才能使用。
 DEFAULT_KEYS = {
-    p: os.environ.get(ev, _HARDCODED_KEYS[p])
-    for p, ev in [("claude","CLAUDE_KEY"), ("deepseek","DEEPSEEK_KEY"), ("qwen","QWEN_KEY")]
+    "claude":   os.environ.get('CLAUDE_KEY', ''),
+    "deepseek": '',
+    "qwen":     '',
 }
 
 MODEL_CONFIG = {
