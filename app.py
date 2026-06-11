@@ -422,9 +422,38 @@ def generate_wiki():
 
     user_msg = f'文献名称：{_documents[doc_id]["name"]}\n\n文本摘样：\n\n{sample}'
     try:
-        raw = _call_llm(provider, client,
-                        [{'role': 'user', 'content': user_msg}],
-                        system=WIKI_SYSTEM, max_tokens=3000)
+        # ── 直接用 requests 绕过所有中间函数，测试 401 根因 ──────────────
+        import requests as _req
+        _direct_key = os.environ.get('ANTHROPIC_API_KEY', '').strip()
+        _direct_headers = {
+            'x-api-key': _direct_key,
+            'anthropic-version': '2023-06-01',
+            'content-type': 'application/json',
+        }
+        print('\n[DIRECT-TEST] headers about to send:', flush=True)
+        for k, v in _direct_headers.items():
+            if k == 'x-api-key':
+                print(f'  x-api-key = {v[:8]!r}...{v[-4:]!r}  len={len(v)}', flush=True)
+            else:
+                print(f'  {k} = {v!r}', flush=True)
+        _direct_payload = {
+            'model': 'claude-sonnet-4-6',
+            'max_tokens': 3000,
+            'system': WIKI_SYSTEM,
+            'messages': [{'role': 'user', 'content': user_msg}],
+        }
+        _direct_resp = _req.post(
+            'https://api.anthropic.com/v1/messages',
+            headers=_direct_headers,
+            json=_direct_payload,
+            timeout=120,
+        )
+        print(f'[DIRECT-TEST] status={_direct_resp.status_code}', flush=True)
+        if _direct_resp.status_code != 200:
+            print(f'[DIRECT-TEST] error body: {_direct_resp.text[:500]}', flush=True)
+            raise Exception(f'Claude API {_direct_resp.status_code}: {_direct_resp.text[:300]}')
+        raw = _direct_resp.json()['content'][0]['text']
+        # ── 直接测试结束 ──────────────────────────────────────────────────
 
         # 打印原始返回，便于在后端日志（cmd）里排查格式问题
         print('\n' + '='*60)
