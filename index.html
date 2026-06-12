@@ -546,9 +546,18 @@ function buildWikiHTML(w) {
       return `<div class="cc-card">
         <div class="cc-term">${esc(c.term||'')}</div>
         <div class="cc-def">${esc(c.definition||'')}</div>
+        ${c.relation?`<div class="cc-def" style="color:var(--rust);margin-top:6px">↔ ${esc(c.relation)}</div>`:''}
         ${tags?`<div class="cc-tags">${tags}</div>`:''}
       </div>`;
     }).join(''), true));
+
+  if (w.debates?.length)
+    parts.push(sec('争论对手', '争', w.debates.length, w.debates.map(d => `
+      <div class="src-item">
+        <div class="src-name">${esc(d.opponent||'')}${d.issue?` · ${esc(d.issue)}`:''}</div>
+        ${d.author_position?`<div class="src-inf">本文：${esc(d.author_position)}</div>`:''}
+        ${d.opponent_position?`<div class="src-inf">对手：${esc(d.opponent_position)}</div>`:''}
+      </div>`).join('')));
 
   if (w.key_figures?.length)
     parts.push(sec('关键人物', '人', w.key_figures.length, w.key_figures.map(f => `
