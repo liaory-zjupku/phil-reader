@@ -387,6 +387,27 @@ def _escape_inner_quotes(s: str) -> str:
         i += 1
     return ''.join(out)
 
+def _close_truncated_json(s: str) -> str:
+    """补全被截断的 JSON：闭合未结束的字符串，再按括号栈补齐 } 和 ]。
+    用于 LLM 输出撞上 max_tokens 被从中间切断的情况，尽量救回成合法 JSON。"""
+    out, in_str, esc, stack = [], False, False, []
+    for ch in s:
+        out.append(ch)
+        if in_str:
+            if esc:                 esc = False
+            elif ch == '\\':        esc = True
+            elif ch == '"':         in_str = False
+            continue
+        if ch == '"':               in_str = True
+        elif ch in '{[':            stack.append(ch)
+        elif ch in '}]' and stack:  stack.pop()
+    res = ''.join(out)
+    if in_str:                      res += '"'          # 闭合半截字符串
+    res = re.sub(r',\s*$', '', res)                     # 去掉末尾悬空逗号
+    while stack:                                        # 按栈反向补齐括号
+        res += '}' if stack.pop() == '{' else ']'
+    return res
+
 def _parse_wiki_json(raw: str) -> dict:
     """多策略解析 LLM 返回为 dict，依次尝试，返回第一个成功的。全部失败抛异常。"""
     block = _extract_json_block(raw)
@@ -396,6 +417,8 @@ def _parse_wiki_json(raw: str) -> dict:
         _escape_inner_quotes(block),                    # 3. 转义内部引号
         _escape_inner_quotes(_repair_json(block)),      # 4. 修复 + 转义引号
         _repair_json(_escape_inner_quotes(block)),      # 5. 转义引号 + 修复
+        _close_truncated_json(_escape_inner_quotes(block)),         # 6. 救回被截断的 JSON
+        _repair_json(_close_truncated_json(_escape_inner_quotes(block))),  # 7. 截断救回 + 修复
     ]
     last_err = None
     for cand in attempts:
@@ -533,7 +556,7 @@ def generate_wiki():
     try:
         raw = _llm_call(provider, api_key,
                         [{'role': 'user', 'content': user_msg}],
-                        system=WIKI_SYSTEM, max_tokens=3000)
+                        system=WIKI_SYSTEM, max_tokens=8000)
 
         try:
             wiki = _parse_wiki_json(raw)
@@ -591,7 +614,9 @@ def chat():
     wiki_parts, concept_terms = [], []
     for did in doc_ids:
         w = _load_wiki(did)
-        if w:
+        # 跳过降级的 plaintext wiki：它的 thesis 是一大坨残缺原始输出，
+        # 塞进 system 会压过原文片段、污染回答。宁可不给 wiki，也要让原文说话。
+        if w and not w.get('_plaintext'):
             name     = _documents.get(did, {}).get('name', did)
             concepts = [c['term'] for c in w.get('core_concepts', []) if c.get('term')]
             concept_terms.extend(concepts)
