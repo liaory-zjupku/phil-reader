@@ -654,7 +654,7 @@ def chat():
         conv = _conversations[session_id]
 
     try:
-        reply = _llm_call(provider, api_key, conv, system=system)
+        reply = _llm_call(provider, api_key, conv, system=system, max_tokens=4000)
         conv.append({'role': 'assistant', 'content': reply})
         return jsonify({'success': True, 'reply': reply, 'sources': sources})
     except Exception as e:
